@@ -3,55 +3,53 @@
 A local web app for researching the WWII service history of **Pfc Herbert Henry Miller**,
 Company H, 120th Infantry Regiment, 30th Infantry Division, U.S. Army (Serial No. 35740482).
 
-Searches photographs across four archival sources simultaneously:
+Searches photographs across four archival sources simultaneously and uses **facial recognition**
+to automatically flag potential photographs of Herbert as you browse.
 
 | Source | API | Key Required |
 |---|---|---|
 | National Archives (NARA) | catalog.archives.gov/api/v1 | No |
 | Library of Congress | loc.gov/pictures | No |
 | Wikimedia Commons | commons.wikimedia.org/w/api.php | No |
-| Europeana | api.europeana.eu | Yes (free) |
+| Europeana | api.europeana.eu | Yes (free, optional) |
 
 ---
 
-## Setup
+## Setup — two commands
 
-### 1. Prerequisites
+Works on **Windows, macOS, and Linux**. No shell scripts, no Unix tools required.
 
-- Node.js 18+
+**Prerequisites:** [Node.js 18+](https://nodejs.org)
 
-### 2. Install dependencies
-
-```bash
+```
 npm run install:all
-```
-
-### 3. Configure environment
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and add your **Europeana API key** (optional — get one free at
-https://apis.europeana.eu/). The other three archives require no key.
-
-### 4. Development
-
-Run the Express backend and Vite dev server concurrently:
-
-```bash
 npm run dev
 ```
 
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:3001
+That's it. The first command installs dependencies, copies face-detection model weights,
+and creates a `.env` file automatically. Open **http://localhost:5173** when the second
+command is running.
 
-### 5. Production build
+### What `npm run install:all` does
 
-```bash
-npm run build   # builds React → /public
-npm start       # serves everything from Express on port 3001
 ```
+✓  Created .env from .env.example
+✓  data/ directory ready
+✓  Copied 8 face-detection model files → client/public/models/
+
+Setup complete! Start the app with:
+
+    npm run dev
+```
+
+### Europeana (optional)
+
+Europeana searches are disabled by default. To enable them:
+
+1. Get a free API key at https://apis.europeana.eu/
+2. Open `.env` and set `EUROPEANA_API_KEY=your_key_here`
+
+The other three archives work without any key.
 
 ---
 
@@ -59,15 +57,26 @@ npm start       # serves everything from Express on port 3001
 
 - **Unified search** across all four archives with one query
 - **Preset buttons** for key research topics:
-  - 30th Infantry Division Normandy
-  - Mortain 1944 / Operation Lüttich
-  - 120th Infantry Regiment
-  - Stalag VII-A Moosburg
-  - Stalag XVIII-C Markt Pongau
+  - 30th Infantry Division Normandy · Mortain 1944 · Operation Lüttich
+  - 120th Infantry Regiment · Stalag VII-A Moosburg · Stalag XVIII-C Markt Pongau
 - **Per-source status** — shows result count or error for each archive
 - **Photo grid** with thumbnail, source badge, title, date, and link to original record
-- **Research Board** — save photos to a persistent sidebar (stored in `data/board.json`)
+- **Face ID** — upload photos of Herbert; the app scans archive results in the background
+  and highlights potential matches (strong match / possible match badges)
+- **Scan history** — every archive photo examined is logged with its match score;
+  re-evaluate any batch when you add new reference photos
+- **Research Board** — save photos to a persistent sidebar
 - **Markdown export** — download saved photos as a formatted research report
+
+---
+
+## Development
+
+```
+npm run dev      # Express (port 3001) + Vite dev server (port 5173) together
+npm run build    # Build React app into /public (for production)
+npm start        # Serve production build on port 3001
+```
 
 ---
 
@@ -78,24 +87,31 @@ npm start       # serves everything from Express on port 3001
 ├── server.js               # Express entry point
 ├── routes/
 │   ├── search.js           # GET /api/search?q=...
-│   └── board.js            # GET/POST/DELETE /api/board + export
+│   ├── board.js            # GET/POST/DELETE /api/board + export
+│   ├── faces.js            # GET/POST/DELETE /api/faces/reference + history
+│   └── imageProxy.js       # GET /api/proxy-image?url=... (CORS proxy)
 ├── services/
 │   ├── nara.js             # NARA Catalog API
 │   ├── loc.js              # Library of Congress Pictures API
 │   ├── wikimedia.js        # Wikimedia Commons MediaWiki API
 │   └── europeana.js        # Europeana API
-├── data/
-│   └── board.json          # Saved photos (git-ignored)
-├── client/                 # Vite + React frontend
+├── scripts/
+│   └── setup.js            # Run by install:all — creates .env, copies models
+├── data/                   # Auto-created; board.json + scan-history.json live here
+├── client/                 # Vite + React 18 frontend
 │   ├── src/
 │   │   ├── App.jsx
 │   │   ├── App.css
+│   │   ├── services/
+│   │   │   └── faceRecognition.js   # Browser-side face detection (face-api.js)
 │   │   └── components/
 │   │       ├── SearchBar.jsx
 │   │       ├── SourceStatus.jsx
 │   │       ├── PhotoGrid.jsx
 │   │       ├── PhotoCard.jsx
+│   │       ├── FacePanel.jsx
 │   │       └── ResearchBoard.jsx
+│   ├── public/models/      # Face-api model weights (copied by setup.js)
 │   ├── index.html
 │   └── vite.config.js
 ├── .env.example
