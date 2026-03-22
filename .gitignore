@@ -3,5 +3,8 @@ client/node_modules/
 .env
 public/
 data/board.json
+data/reference-faces.json
+data/scan-history.json
+client/public/models/*.bin
 *.log
 .DS_Store

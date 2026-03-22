@@ -15,5 +15,10 @@ export default defineConfig({
   build: {
     outDir: '../public',
     emptyOutDir: true,
+    chunkSizeWarningLimit: 1500, // face-api.js + TF.js is intentionally large
+  },
+  // face-api.js / TensorFlow.js need to be pre-bundled for Vite compatibility
+  optimizeDeps: {
+    exclude: ['@vladmandic/face-api'],
   },
 });

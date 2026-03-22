@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { STRONG_MATCH, POSSIBLE_MATCH } from '../services/faceRecognition';
 
 const SOURCE_COLORS = {
   NARA: '#c8a84b',
@@ -7,7 +8,33 @@ const SOURCE_COLORS = {
   Europeana: '#c96b6b',
 };
 
-export default function PhotoCard({ photo, saved, onSave }) {
+function FaceBadge({ scan, isScanning }) {
+  if (isScanning) {
+    return <span className="face-badge scanning">Scanning…</span>;
+  }
+  if (!scan) return null;
+  if (!scan.faceDetected) return null;
+
+  const score = scan.score;
+  if (score === null || score === undefined) return null;
+  if (score < STRONG_MATCH) {
+    return (
+      <span className="face-badge strong-match" title={`Distance: ${score.toFixed(3)}`}>
+        Strong match
+      </span>
+    );
+  }
+  if (score < POSSIBLE_MATCH) {
+    return (
+      <span className="face-badge possible-match" title={`Distance: ${score.toFixed(3)}`}>
+        Possible match
+      </span>
+    );
+  }
+  return null;
+}
+
+export default function PhotoCard({ photo, saved, onSave, scanResult, isScanning }) {
   const [imgError, setImgError] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -19,9 +46,10 @@ export default function PhotoCard({ photo, saved, onSave }) {
   }
 
   const badgeColor = SOURCE_COLORS[photo.source] || '#888';
+  const isMatch = scanResult?.isMatch;
 
   return (
-    <article className="photo-card">
+    <article className={`photo-card ${isMatch ? 'face-match' : ''}`}>
       <div className="photo-thumb-wrap">
         {!imgError && photo.thumbnail ? (
           <img
@@ -37,6 +65,7 @@ export default function PhotoCard({ photo, saved, onSave }) {
         <span className="source-badge" style={{ backgroundColor: badgeColor }}>
           {photo.source}
         </span>
+        <FaceBadge scan={scanResult} isScanning={isScanning} />
       </div>
 
       <div className="photo-info">

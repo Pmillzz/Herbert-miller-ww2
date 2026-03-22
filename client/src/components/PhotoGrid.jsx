@@ -1,9 +1,11 @@
 import PhotoCard from './PhotoCard';
 
-export default function PhotoGrid({ photos, savedIds, onSave }) {
+export default function PhotoGrid({ photos, savedIds, onSave, scanResults, currentlyScanningId }) {
   return (
     <section className="photo-grid-section">
-      <p className="results-count">{photos.length} photograph{photos.length !== 1 ? 's' : ''} found</p>
+      <p className="results-count">
+        {photos.length} photograph{photos.length !== 1 ? 's' : ''} found
+      </p>
       <div className="photo-grid">
         {photos.map((photo) => (
           <PhotoCard
@@ -11,6 +13,8 @@ export default function PhotoGrid({ photos, savedIds, onSave }) {
             photo={photo}
             saved={savedIds.has(photo.id)}
             onSave={onSave}
+            scanResult={scanResults?.[photo.id]}
+            isScanning={currentlyScanningId === photo.id}
           />
         ))}
       </div>

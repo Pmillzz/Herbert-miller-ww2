@@ -119,6 +119,32 @@ Removes the photo with the given `id` from the board.
 
 Returns a `text/markdown` file download — the full research report.
 
+### `GET /api/faces/reference`
+### `POST /api/faces/reference`
+### `DELETE /api/faces/reference/:id`
+
+CRUD for reference face descriptors. POST body: `{filename, thumbnail (data URL), descriptor (number[])}`.
+
+### `GET /api/faces/history`
+
+Full scan history sorted by `matchScore` ascending (best matches first).
+
+### `GET /api/faces/history/stats`
+
+Returns `{total, withFace, matches, needsRescan}` counts.
+
+### `POST /api/faces/history`
+
+Upsert a scan result (keyed by `photoId`). Body: `{photoId, source, title, thumbnailUrl, originalUrl, referenceIds, matchScore, faceDetected, isMatch}`.
+
+### `DELETE /api/faces/history`
+
+Clear all scan history.
+
+### `GET /api/proxy-image?url=...`
+
+CORS proxy — fetches and relays archive images from an allowlisted set of domains. Used by the browser to draw thumbnails to canvas for face detection.
+
 ---
 
 ## Environment Variables
@@ -143,6 +169,69 @@ in `status.europeana` but the other three archives still work.
 | `lastQuery` | `string` | The most recently executed query |
 | `savedPhotos` | `Photo[]` | Board contents, loaded from `/api/board` on mount |
 | `boardOpen` | `boolean` | Controls the Research Board sidebar visibility |
+
+---
+
+## Face Recognition Feature
+
+### Architecture
+
+Face detection runs **entirely in the browser** using `@vladmandic/face-api` (TensorFlow.js, WebGL backend). Photos never leave the user's machine. Only 128-dimensional float descriptors are sent to the Express server for storage.
+
+```
+client
+  └─ services/faceRecognition.js   Dynamic import of face-api.js + model loading
+  └─ components/FacePanel.jsx      Reference photo upload + scan history UI
+
+server
+  ├─ routes/faces.js               /api/faces/reference (CRUD) + /api/faces/history (CRUD)
+  └─ routes/imageProxy.js          /api/proxy-image?url=... (CORS proxy for archive images)
+
+data/
+  ├─ reference-faces.json          Uploaded reference descriptors (git-ignored)
+  └─ scan-history.json             Historical scan results (git-ignored)
+
+client/public/models/              Face-api model weights (git-ignored, copied by scripts/copy-models.js)
+```
+
+### Model setup
+
+Models are copied from the npm package into `client/public/models/` by `scripts/copy-models.js`, which runs automatically as part of `npm run install:all`.
+
+Models needed: `ssd_mobilenetv1`, `face_landmark_68`, `face_recognition_model`.
+
+### Image proxy
+
+Archive thumbnail URLs are cross-origin. To run face detection on them without CORS issues, all images are fetched via the server-side proxy:
+
+```
+GET /api/proxy-image?url=https://catalog.archives.gov/...
+```
+
+Only URLs from known archival domains are permitted (SSRF protection) — see `ALLOWED_DOMAINS` in `routes/imageProxy.js`.
+
+### Match thresholds (Euclidean distance — lower = more similar)
+
+| Constant | Value | Meaning |
+|---|---|---|
+| `STRONG_MATCH` | 0.50 | High confidence — same person |
+| `POSSIBLE_MATCH` | 0.62 | Worth flagging — possible match |
+
+### Re-evaluation logic
+
+Each `scan-history.json` entry stores the `referenceIds` array used during that scan. When new reference photos are added, entries whose `referenceIds` don't match the current set are flagged as `needsRescan` by `GET /api/faces/history/stats`. The **Re-scan outdated** button in the Face ID panel re-scans those entries using the stored `thumbnailUrl` without requiring a new archive search.
+
+### Face panel state in App.jsx
+
+| State / ref | Type | Description |
+|---|---|---|
+| `referencePhotos` | `Ref[]` | Full ref objects from server |
+| `refDescriptors` | `useRef` | `{id, descriptor}[]` — used by scan queue (avoids stale closures) |
+| `scanResults` | `{[photoId]: ScanResult}` | Match results for all ever-scanned photos |
+| `modelsStatus` | `'idle'\|'loading'\|'ready'\|'error'` | TF.js model load state |
+| `autoScan` | `boolean` | Auto-scan new search results when models are ready |
+| `scanQueueRef` | `useRef` | FIFO queue of Photo objects pending scan |
+| `scanRunningRef` | `useRef` | Mutex — prevents concurrent queue processing |
 
 ---
 
