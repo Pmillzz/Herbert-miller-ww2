@@ -3,10 +3,18 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 
+// Load API keys saved via the Settings panel (overrides .env values)
+const { loadSettings } = require('./routes/settings');
+const savedSettings = loadSettings();
+for (const [key, val] of Object.entries(savedSettings)) {
+  if (val) process.env[key] = val;
+}
+
 const searchRouter = require('./routes/search');
 const boardRouter = require('./routes/board');
 const facesRouter = require('./routes/faces');
 const imageProxyRouter = require('./routes/imageProxy');
+const { router: settingsRouter } = require('./routes/settings');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -19,6 +27,7 @@ app.use('/api/search', searchRouter);
 app.use('/api/board', boardRouter);
 app.use('/api/faces', facesRouter);
 app.use('/api/proxy-image', imageProxyRouter);
+app.use('/api/settings', settingsRouter);
 
 // Serve built React app in production
 const publicDir = path.join(__dirname, 'public');
@@ -29,6 +38,9 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+  if (!process.env.NARA_API_KEY) {
+    console.warn('⚠  NARA_API_KEY not set — NARA searches will be disabled. Email Catalog_API@nara.gov for a free key.');
+  }
   if (!process.env.EUROPEANA_API_KEY) {
     console.warn('⚠  EUROPEANA_API_KEY not set — Europeana searches will be disabled.');
   }

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.archives.gov)",
+      "WebFetch(domain:www.loc.gov)"
+    ]
+  }
+}

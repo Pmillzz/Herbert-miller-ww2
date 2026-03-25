@@ -1,45 +1,35 @@
 const axios = require('axios');
 
-const BASE_URL = 'https://catalog.archives.gov/api/v1/';
+const BASE_URL = 'https://catalog.archives.gov/api/v2/records/search';
 
 /**
- * Normalize a single NARA result into our common photo shape.
+ * Normalize a single NARA v2 hit into our common photo shape.
  */
-function normalizeResult(item) {
-  const naId = item.naId || '';
-  const desc = item.description || {};
+function normalizeResult(hit) {
+  const record = hit._source?.record || {};
+  const naId = record.naId || hit._id || '';
 
-  // Description can be keyed as 'item', 'fileUnit', 'series', etc.
-  const descBody = desc.item || desc.fileUnit || desc.series || desc.recordGroup || {};
+  const title = record.title || 'Untitled';
 
-  const title =
-    descBody.title ||
-    (Array.isArray(descBody.title) ? descBody.title[0] : null) ||
-    'Untitled';
-
-  // Date — productionDateArray or scopeAndContentNote year
+  // Date — productionDates array
   let date = null;
-  const pda = descBody.productionDateArray;
-  if (pda) {
-    const entry = Array.isArray(pda.proposableQualifiableDate)
-      ? pda.proposableQualifiableDate[0]
-      : pda.proposableQualifiableDate;
-    date = entry?.year || entry?.logicalDate || null;
+  const pd = record.productionDates;
+  if (Array.isArray(pd) && pd.length > 0) {
+    date = pd[0].logicalDate || String(pd[0].year) || null;
   }
 
-  // Thumbnail — try objects first, then thumbnailFile
+  // Thumbnail — first digitalObject that is an image
   let thumbnail = null;
-  const objects = item.objects;
-  if (objects) {
-    const obj = Array.isArray(objects.object) ? objects.object[0] : objects.object;
-    if (obj?.thumbnail?.['@url']) {
-      thumbnail = obj.thumbnail['@url'];
-    } else if (obj?.file?.['@url']) {
-      thumbnail = obj.file['@url'];
+  const objects = record.digitalObjects;
+  if (Array.isArray(objects)) {
+    const imgObj = objects.find((o) => {
+      const type = (o.objectType || '').toLowerCase();
+      const fname = (o.objectFilename || '').toLowerCase();
+      return type.includes('image') || fname.endsWith('.jpg') || fname.endsWith('.jpeg') || fname.endsWith('.tif');
+    });
+    if (imgObj?.objectUrl) {
+      thumbnail = imgObj.objectUrl;
     }
-  }
-  if (!thumbnail && descBody.thumbnailFile?.['@url']) {
-    thumbnail = descBody.thumbnailFile['@url'];
   }
 
   return {
@@ -53,22 +43,31 @@ function normalizeResult(item) {
 }
 
 async function search(query) {
-  const params = {
-    q: query,
-    resultTypes: 'item',
-    rows: 20,
-    offset: 0,
-  };
+  const apiKey = process.env.NARA_API_KEY;
+  if (!apiKey) {
+    throw new Error('NARA_API_KEY not configured in .env — email Catalog_API@nara.gov to request a free key');
+  }
 
-  const response = await axios.get(BASE_URL, { params, timeout: 15000 });
-  const raw = response.data?.opaResponse?.results?.result;
+  const response = await axios.get(BASE_URL, {
+    params: {
+      q: query,
+      typeOfMaterials: 'photographs and other graphic materials',
+      availableOnline: true,
+      rows: 20,
+    },
+    headers: {
+      'x-api-key': apiKey,
+      'Content-Type': 'application/json',
+    },
+    timeout: 15000,
+  });
 
-  if (!raw) return [];
+  const hits = response.data?.body?.hits?.hits;
+  if (!Array.isArray(hits)) return [];
 
-  const results = Array.isArray(raw) ? raw : [raw];
-  return results
+  return hits
     .map(normalizeResult)
-    .filter((p) => p.thumbnail); // only photos with a visible image
+    .filter((p) => p.thumbnail);
 }
 
 module.exports = { search };

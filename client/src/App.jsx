@@ -4,6 +4,7 @@ import SourceStatus from './components/SourceStatus';
 import PhotoGrid from './components/PhotoGrid';
 import ResearchBoard from './components/ResearchBoard';
 import FacePanel from './components/FacePanel';
+import SettingsPanel from './components/SettingsPanel';
 import {
   loadModels,
   isModelsLoaded,
@@ -25,6 +26,9 @@ export default function App() {
   const [sourceStatus, setSourceStatus] = useState(INITIAL_STATUS);
   const [loading, setLoading] = useState(false);
   const [lastQuery, setLastQuery] = useState('');
+
+  // ── Settings ───────────────────────────────────────────────────
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // ── Research board ─────────────────────────────────────────────
   const [savedPhotos, setSavedPhotos] = useState([]);
@@ -318,6 +322,14 @@ export default function App() {
           </div>
           <div className="header-actions">
             <button
+              className="settings-toggle"
+              onClick={() => setSettingsOpen(true)}
+              title="API Settings"
+              aria-label="Open API settings"
+            >
+              ⚙
+            </button>
+            <button
               className={`face-toggle ${facePanelOpen ? 'active' : ''} ${hasFaceFeature ? 'has-refs' : ''}`}
               onClick={() => setFacePanelOpen((v) => !v)}
             >
@@ -385,6 +397,10 @@ export default function App() {
           onRemove={handleRemove}
           onClose={() => setBoardOpen(false)}
         />
+      )}
+
+      {settingsOpen && (
+        <SettingsPanel onClose={() => setSettingsOpen(false)} />
       )}
 
       {facePanelOpen && (
